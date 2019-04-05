@@ -24,7 +24,7 @@ class SummaryTool(object):
         #sentences = [y for x in sentences for y in x]
 
         # remove some punctuations and special characters
-        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',€$£]", " ")
+        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',.€$£]", " ")
 
         # make alphabets lowercas"
         #clean_sentences = [s.lower() for s in clean_sentences]
