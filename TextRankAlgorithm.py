@@ -23,11 +23,11 @@ class SummaryTool(object):
         # flatten the list
         #sentences = [y for x in sentences for y in x]
 
-        # remove punctuations, numbers and special characters
-        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z]", " ")
+        # remove some punctuations and special characters
+        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',]", " ")
 
         # make alphabets lowercase
-        clean_sentences = [s.lower() for s in clean_sentences]
+        #clean_sentences = [s.lower() for s in clean_sentences]
 
         # function to remove stopwords
         def remove_stopwords(sen):
@@ -156,9 +156,10 @@ def main():
     #    print("%s. %s" % ((idx + 1), ' '.join(sentence)))
     #print(st.formatSentences(file))
     print(st.get_summary(file))
-    #summary = st.get_summary(file)
-    #for i in range(10):
-     #f.write("This is line %d\r\n" % (i+1))
+    summary = st.get_summary(file)
+    f = open('output','w')
+    f.write(summary)
+    f.close()
 
 if __name__ == '__main__':
     main()
