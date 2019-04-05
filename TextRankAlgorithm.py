@@ -157,7 +157,7 @@ def main():
     #print(st.formatSentences(file))
     print(st.get_summary(file))
     summary = st.get_summary(file)
-    f = open('output','w')
+    f = open('output.txt','w')
     f.write(summary)
     f.close()
 
