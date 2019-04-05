@@ -24,7 +24,7 @@ class SummaryTool(object):
         #sentences = [y for x in sentences for y in x]
 
         # remove some punctuations and special characters
-        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',.€$£]", " ")
+        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',.€$£)(]", " ")
 
         # make alphabets lowercas"
         #clean_sentences = [s.lower() for s in clean_sentences]
@@ -128,11 +128,7 @@ class SummaryTool(object):
 
 
     def textrank(self, sentences, top_n=1, stopwords=None):
-        """
-        sentences = a list of sentences [[w11, w12, ...], [w21, w22, ...], ...]
-        top_n = how may sentences the summary should contain
-        stopwords = a list of stopwords
-        """
+        
         S = self.build_similarity_matrix(sentences, stop_words)
         sentence_ranks = self.pagerank(S)
 
@@ -145,21 +141,42 @@ class SummaryTool(object):
 
 def main():
 
-
-    file = open("textfile.txt","w")
-
     st = SummaryTool()
 
-    file = open('SampleFile.txt').read()
+    file = open('SampleFile.txt')#.read()
+
+    lines = file.readlines()
+    noOfLines = len(lines)
+
+    # checking if file is empty
+    if noOfLines <= 1:
+        sys.exit("News Article contains no title/content!")
+    else:
+    #Get first line for title and rest for content
+        title = lines[0]
+        remainingContent = lines[1:]
+        content ="".join(remainingContent)
+        file.close()
+
     #filteredText = st.formatSentences(file)
     #for idx, sentence in enumerate(st.textrank(filteredText, stopwords=stopwords.words('english'))):
     #    print("%s. %s" % ((idx + 1), ' '.join(sentence)))
     #print(st.formatSentences(file))
-    print(st.get_summary(file))
-    summary = st.get_summary(file)
-    f = open('output.txt','w')
-    f.write(summary)
-    f.close()
+
+        summary = st.get_summary(content)
+        print(summary)
+        print ("")
+        print ("Original Length %s" % (len(title) + len(content)))
+        print ("Summary Length %s" % len(summary))
+        print ("Summary Ratio: %s" % (100 - (100 * (len(summary) / (len(title) + len(content))))))
+        f = open('output.txt','w')
+        f.write(title)
+        f.write(summary)
+        f.write("\n\n")
+        f.write("Original Length %s\n" % (len(title) + len(content)))
+        f.write("Summary Length %s\n" % len(summary))
+        f.write("Summary Ratio: %s\n" % (100 - (100 * (len(summary) / (len(title) + len(content))))))
+        f.close()
 
 if __name__ == '__main__':
     main()
