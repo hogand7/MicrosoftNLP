@@ -1,200 +1,190 @@
-# coding=UTF-8
-from __future__ import division
+import numpy as np
+import pandas as pd
+import nltk
+import os
+import csv
+import sys
+from nltk.tokenize import sent_tokenize
+nltk.download('punkt') # one time execution
+nltk.download('stopwords')# one time execution
+from nltk.corpus import stopwords
+from nltk.cluster.util import cosine_distance
+stop_words = stopwords.words('english')
 import re
-import spacy
-import difflib
-
-### Load spaCy's English NLP model
-nlp = spacy.load('en_core_web_lg')
-
+from operator import itemgetter
 
 class SummaryTool(object):
+    #Function which reads multiple files
+    def read_multiple_files(self,path):
+        file_list=list()
+        i=0
+        for file in [txt for txt in os.listdir(path)if txt.endswith('.txt')]:
+            f = file_list.append(file)
+        return file_list
 
-
-    #testing: two list parameters, prints out the difference of the summaries
-    def testing( self,summaryA , summaryB):
-        # initiate the Differ object
-        d = difflib.Differ()
-        # calculate the difference between the two texts
-        diff = d.compare(summaryA, summaryB)
-        # output the result
-        print ('\n'.join(diff))
-        # - : word missing, + : word added, ? - shows this wprd with ^^, added missed whole sentences at end
-                                # will print whole summary if theres no mismatch
-
-
-    # Split Text into sentences
-    def split_content_to_sentences(self, content):
-        content = content.replace("\n", ". ")
-        return content.split(". ")
-
-    #Split text into paragraphs
     def split_content_to_paragraphs(self, content):
         return content.split("\n\n")
 
-    # Caculate the intersection between 2 sentences
-    def sentences_intersection(self, sent1, sent2):
+    def formatSentences(self, content):
 
-        # split the sentence into words/tokens
-        s1 = set(sent1.split(" "))
-        s2 = set(sent2.split(" "))
+        # split the the text in the articles into sentences
+        sentences = sent_tokenize(content)
 
-        # If there is not intersection, just return 0
-        if (len(s1) + len(s2)) == 0:
-            return 0
+        # flatten the list
+        #sentences = [y for x in sentences for y in x]
 
-        # We normalize the result by the average number of words
-        return len(s1.intersection(s2)) / ((len(s1) + len(s2)) / 2)
+        # remove some punctuations and special characters
+        clean_sentences = pd.Series(sentences).str.replace("[^a-zA-Z0-9',.€$£)(]", " ")
 
-    # Format a sentence - remove all non-alphbetic chars from the sentence
-    # We'll use the formatted sentence as a key in our sentences dictionary
-    def format_sentence(self, sentence):
-        sentence = re.sub(r'\W+', '', sentence)
-        return sentence
+        # make alphabets lowercas"
+        #clean_sentences = [s.lower() for s in clean_sentences]
 
-    # Convert the content into a dictionary <K, V>
-    # k = The formatted sentence
-    # V = The rank of the sentence
-    def get_senteces_ranks(self, content):
+        # function to remove stopwords
+        def remove_stopwords(sen):
+            sen_new = " ".join([i for i in sen if i not in stop_words])
+            return sen_new
 
-        # Split the content into sentences
-        sentences = self.split_content_to_sentences(content)
+        # remove stopwords from the sentences
+        #clean_sentences = [remove_stopwords(r.split()) for r in clean_sentences]
 
-        # Calculate the intersection of every two sentences
-        try:
-            xrange
-        except NameError:
-            xrange = range
+        return clean_sentences
 
-        n = len(sentences)
-        values = [[0 for x in xrange(n)] for x in xrange(n)]
-        for i in range(0, n):
-            for j in range(0, n):
-                values[i][j] = self.sentences_intersection(sentences[i], sentences[j])
+    def sentence_similarity(self, sent1, sent2, stopwords=None):
+        if stopwords is None:
+            stopwords = []
+
+        all_words = list(set(sent1 + sent2))
+
+        vector1 = [0] * len(all_words)
+        vector2 = [0] * len(all_words)
+
+        # build the vector for the first sentence
+        for w in sent1:
+            if w in stopwords:
+                continue
+            vector1[all_words.index(w)] += 1
+
+        # build the vector for the second sentence
+        for w in sent2:
+            if w in stopwords:
+                continue
+            vector2[all_words.index(w)] += 1
+
+        return 1 - cosine_distance(vector1, vector2)
+
+    def build_similarity_matrix(self, sentences, stopwords=None):
+        # Create an empty similarity matrix
+        S = np.zeros((len(sentences), len(sentences)))
 
 
-        # Build the sentences dictionary
-        # The score of a sentences is the sum of all its intersection
-        sentences_dic = {}
-        for i in range(0, n):
-            score = 0
-            for j in range(0, n):
-                if i == j:
+        for idx1 in range(len(sentences)):
+            for idx2 in range(len(sentences)):
+                if idx1 == idx2:
                     continue
-                score += values[i][j]
-            sentences_dic[self.format_sentence(sentences[i])] = score
-        return sentences_dic
 
-    # Return the best sentence in a paragraph
-    def get_best_sentence(self, paragraph, sentences_dic):
+                S[idx1][idx2] = self.sentence_similarity(sentences[idx1], sentences[idx2], stop_words)
 
-        # Split the paragraph into sentences
-        sentences = self.split_content_to_sentences(paragraph)
+        # normalize the matrix row-wise
+        for idx in range(len(S)):
+            if S[idx].sum()==0:
+                continue
+            S[idx] /= S[idx].sum()
 
-        # Ignore short paragraphs
-        if len(sentences) < 2:
-            return ""
+        return S
 
-        # Get the best sentence according to the sentences dictionary
-        best_sentence = ""
-        max_value = 0
-        for s in sentences:
-            strip_s = self.format_sentence(s)
-            if strip_s:
-                if sentences_dic[strip_s] > max_value:
-                    max_value = sentences_dic[strip_s]
-                    best_sentence = s
+    def pagerank(self, A, eps=0.0001, d=0.85):
+        P = np.ones(len(A)) / len(A)
+        while True:
+            new_P = np.ones(len(A)) * (1 - d) / len(A) + d * A.T.dot(P)
+            delta = abs(new_P - P).sum()
+            if delta <= eps:
+                return new_P
+            P = new_P
 
-        return best_sentence
 
-    # Build the summary
-    def get_summary(self, title, content, sentences_dic):
+    def build_transition_matrix(self, links, index):
+        total_links = 0
+        A = np.zeros((len(index), len(index)))
+        for webpage in links:
+            # dangling page
+            if not links[webpage]:
+                # Assign equal probabilities to transition to all the other pages
+                A[index[webpage]] = np.ones(len(index)) / len(index)
+            else:
+                for dest_webpage in links[webpage]:
+                    total_links += 1
+                    A[index[webpage]][index[dest_webpage]] = 1.0 / len(links[webpage])
+
+        return A
+
+    def get_summary(self, content):
 
         # Split the content into paragraphs
         paragraphs = self.split_content_to_paragraphs(content)
 
         # Add the title
         summary = []
-        summary.append(title.strip())
+        #summary.append(title.strip())
         summary.append("")
 
         # Add the best sentence from each paragraph
         for p in paragraphs:
-            sentence = self.get_best_sentence(p, sentences_dic).strip()
+            cleanParagraph = self.formatSentences(p)
+            sentence = self.textrank(cleanParagraph, stopwords=stopwords.words('english')).strip()
             if sentence:
                 summary.append(sentence)
 
         return ("\n").join(summary)
 
 
-# Main method, just run "python summary_tool.py"
+    def textrank(self, sentences, top_n=1, stopwords=None):
+
+        S = self.build_similarity_matrix(sentences, stop_words)
+        sentence_ranks = self.pagerank(S)
+
+        # Sort the sentence ranks
+        ranked_sentence_indexes = [item[0] for item in sorted(enumerate(sentence_ranks), key=lambda item: -item[1])]
+        selected_sentences = sorted(ranked_sentence_indexes[:top_n])
+        summary = itemgetter(*selected_sentences)(sentences)
+        return summary
+
+
 def main():
 
-    # Demo
-    # Content from: "http://thenextweb.com/apps/2013/03/21/swayy-discover-curate-content/"
-
-    title = """
-    Swayy is a beautiful new dashboard for discovering and curating online content [Invites]
-    """
-
-    content = """
-    Lior Degani, the Co-Founder and head of Marketing of Swayy, pinged me last week when I was in California to tell me about his startup and give me beta access. I heard his pitch and was skeptical. I was also tired, cranky and missing my kids – so my frame of mind wasn’t the most positive.
-    I went into Swayy to check it out, and when it asked for access to my Twitter and permission to tweet from my account, all I could think was, “If this thing spams my Twitter account I am going to bitch-slap him all over the Internet.” Fortunately that thought stayed in my head, and not out of my mouth.
-    One week later, I’m totally addicted to Swayy and glad I said nothing about the spam (it doesn’t send out spam tweets but I liked the line too much to not use it for this article). I pinged Lior on Facebook with a request for a beta access code for TNW readers. I also asked how soon can I write about it. It’s that good. Seriously. I use every content curation service online. It really is That Good.
-    What is Swayy? It’s like Percolate and LinkedIn recommended articles, mixed with trending keywords for the topics you find interesting, combined with an analytics dashboard that shows the trends of what you do and how people react to it. I like it for the simplicity and accuracy of the content curation. Everything I’m actually interested in reading is in one place – I don’t have to skip from another major tech blog over to Harvard Business Review then hop over to another major tech or business blog. It’s all in there. And it has saved me So Much Time
-
-    After I decided that I trusted the service, I added my Facebook and LinkedIn accounts. The content just got That Much Better. I can share from the service itself, but I generally prefer reading the actual post first – so I end up sharing it from the main link, using Swayy more as a service for discovery.
-    I’m also finding myself checking out trending keywords more often (more often than never, which is how often I do it on Twitter.com).
-
-    The analytics side isn’t as interesting for me right now, but that could be due to the fact that I’ve barely been online since I came back from the US last weekend. The graphs also haven’t given me any particularly special insights as I can’t see which post got the actual feedback on the graph side (however there are numbers on the Timeline side.) This is a Beta though, and new features are being added and improved daily. I’m sure this is on the list. As they say, if you aren’t launching with something you’re embarrassed by, you’ve waited too long to launch.
-    It was the suggested content that impressed me the most. The articles really are spot on – which is why I pinged Lior again to ask a few questions:
-    How do you choose the articles listed on the site? Is there an algorithm involved? And is there any IP?
-    Yes, we’re in the process of filing a patent for it. But basically the system works with a Natural Language Processing Engine. Actually, there are several parts for the content matching, but besides analyzing what topics the articles are talking about, we have machine learning algorithms that match you to the relevant suggested stuff. For example, if you shared an article about Zuck that got a good reaction from your followers, we might offer you another one about Kevin Systrom (just a simple example).
-    Who came up with the idea for Swayy, and why? And what’s your business model?
-    Our business model is a subscription model for extra social accounts (extra Facebook / Twitter, etc) and team collaboration.
-    The idea was born from our day-to-day need to be active on social media, look for the best content to share with our followers, grow them, and measure what content works best.
-    Who is on the team?
-    Ohad Frankfurt is the CEO, Shlomi Babluki is the CTO and Oz Katz does Product and Engineering, and I [Lior Degani] do Marketing. The four of us are the founders. Oz and I were in 8200 [an elite Israeli army unit] together. Emily Engelson does Community Management and Graphic Design.
-    If you use Percolate or read LinkedIn’s recommended posts I think you’ll love Swayy.
-    ➤ Want to try Swayy out without having to wait? Go to this secret URL and enter the promotion code thenextweb
-
-    """
-
-    # Create a SummaryTool object
     st = SummaryTool()
 
-    # Build the sentences dictionary
-    sentences_dic = st.get_senteces_ranks(content)
+    path = 'C:\\Users\\Nissimol Aji\\AtomWorkSpace\\Checker\\Business'
+    read_files = st.read_multiple_files(path)
+    for file in read_files:
+        filepath = os.path.join(path,file)
+        f = open(filepath,'r')
+    #    file = f.read()
+        lines = f.readlines()
+        noOfLines = len(f)
 
-    # Build the summary with the sentences dictionary
-    summary = st.get_summary(title, content, sentences_dic)
-    mainSummary = st.split_content_to_sentences(summary)
-    print(mainSummary)
-    print("\n")
-
-    file = open('SampleFile.txt', encoding="utf8")
-    f = file.read()
-    textSummary = st.split_content_to_sentences(f)
-    print(textSummary)
-    print("\n")
-    #document = nlp(file)
-    #mainSummary = st.split_content_to_sentences(summary)
-    #textSummary = st.split_content_to_sentences(document)
-
-    checker = st.testing(mainSummary,textSummary)
-
-
-
-
-    # Print the summary
-#    print (summary)
-
-    # Print the ratio between the summary length and the original length
-    print ("")
-    print ("Original Length %s" % (len(title) + len(content)))
-    print ("Summary Length %s" % len(summary))
-    print ("Summary Ratio: %s" % (100 - (100 * (len(summary) / (len(title) + len(content))))))
-
+        # checking if file is empty
+        if noOfLines <= 1:
+            sys.exit("News Article contains no title/content!")
+        else:
+            #Get first line for title and rest for content
+            title = lines[0]
+            remainingContent = lines[1:]
+            content ="".join(remainingContent)
+            f.close()
+            summary = st.get_summary(content)
+            print(summary)
+            print ("")
+            print ("Original Length %s" % (len(title) + len(content)))
+            print ("Summary Length %s" % len(summary))
+            print ("Summary Ratio: %s" % (100 - (100 * (len(summary) / (len(title) + len(content))))))
+            f = open('output.txt','w')
+            f.write(title)
+            f.write(summary)
+            f.write("\n\n")
+            f.write("Original Length %s\n" % (len(title) + len(content)))
+            f.write("Summary Length %s\n" % len(summary))
+            f.write("Summary Ratio: %s\n" % (100 - (100 * (len(summary) / (len(title) + len(content))))))
+            f.close()
 
 if __name__ == '__main__':
     main()
