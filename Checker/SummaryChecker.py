@@ -180,6 +180,7 @@ def main():
     st = summaryChecker()
 
     path = 'C:\\Users\\Nissimol Aji\\AtomWorkSpace\\Checker\\TextFiles'
+    otherSummary = open('Samplefile.txt').read()
     read_files = st.read_multiple_files(path)
     for file in read_files:
         filepath = os.path.join(path,file)
@@ -188,8 +189,8 @@ def main():
         print(file)
         summary = st.get_summary(file)
         mainSummary = st.split_content_to_sentences(summary)
-        print(mainSummary)
-        print("\n")
+        checkSummary = st.split_content_to_sentences(otherSummary)
+        testing=compare(mainSummary,checkSummary)
         f.close()
 
 
