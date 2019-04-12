@@ -1,3 +1,13 @@
+#Instructions to Install
+#Install pip3 installer which should install with Python 3 or when you use commmand pip3 for any of the further installations, follow its Instructions
+#Open Command line
+#python -m pip install --user numpy
+#pip install pandas
+#pip install nltk
+#pip install regex (if required)
+#if operator is not installed , download off the web or use pip install operator or pip install install pyopertor
+#run code by giving it an article and will output to command line and an external file
+
 import numpy as np
 import pandas as pd
 import nltk
@@ -15,6 +25,7 @@ class SummaryTool(object):
     def split_content_to_paragraphs(self, content):
         return content.split("\n\n")
 
+#function to clean out the sentences and format them for our program
     def formatSentences(self, content):
 
         # split the the text in the articles into sentences
@@ -39,29 +50,31 @@ class SummaryTool(object):
 
         return clean_sentences
 
-    def sentence_similarity(self, sent1, sent2, stopwords=None):
+#function for sentence similarity
+    def sentence_similarity(self, sentOne, sentTwo, stopwords=None):
         if stopwords is None:
             stopwords = []
 
-        all_words = list(set(sent1 + sent2))
+        all_words = list(set(sentOne + sentTwo))
 
         vector1 = [0] * len(all_words)
         vector2 = [0] * len(all_words)
 
         # build the vector for the first sentence
-        for w in sent1:
+        for w in sentOne:
             if w in stopwords:
                 continue
             vector1[all_words.index(w)] += 1
 
         # build the vector for the second sentence
-        for w in sent2:
+        for w in sentTwo:
             if w in stopwords:
                 continue
             vector2[all_words.index(w)] += 1
 
         return 1 - cosine_distance(vector1, vector2)
 
+#matrix
     def build_similarity_matrix(self, sentences, stopwords=None):
         # Create an empty similarity matrix
         S = np.zeros((len(sentences), len(sentences)))
@@ -82,6 +95,7 @@ class SummaryTool(object):
 
         return S
 
+#pagerank algorithm
     def pagerank(self, A, eps=0.0001, d=0.85):
         P = np.ones(len(A)) / len(A)
         while True:
@@ -90,7 +104,6 @@ class SummaryTool(object):
             if delta <= eps:
                 return new_P
             P = new_P
-
 
     def build_transition_matrix(self, links, index):
         total_links = 0
@@ -126,9 +139,9 @@ class SummaryTool(object):
 
         return ("\n").join(summary)
 
-
+#textrank
     def textrank(self, sentences, top_n=1, stopwords=None):
-        
+
         S = self.build_similarity_matrix(sentences, stop_words)
         sentence_ranks = self.pagerank(S)
 
